@@ -1,4 +1,1 @@
-\# Trabalho Prático - Linguagem Natural
-
-
-
+# Trabalho Prático - Linguagem Natural
