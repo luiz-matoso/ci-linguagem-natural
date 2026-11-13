@@ -1,5 +1,9 @@
 # Decisões - Trabalho Prático de Linguagem Natural
 
+As decisões da implementação da v1, a calibração do limiar e a análise de
+erros estão em [dedisoes.md](../dedisoes.md), nome solicitado para esta etapa.
+Este arquivo preserva o registro original da v0.
+
 ## Domínio escolhido
 
 O domínio escolhido foi **Eleições 2026**.

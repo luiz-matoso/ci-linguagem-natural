@@ -5,6 +5,7 @@ from nltk.stem import RSLPStemmer
 from nltk.tokenize import word_tokenize
 
 def _remover_acentos(texto):
+    # Separa os acentos das letras antes de descartar as marcas combinantes.
     nfd = unicodedata.normalize("NFD", texto)
     return "".join(
         caractere
@@ -21,6 +22,7 @@ def normalizar(
     remover_stopwords=True,
     aplicar_stemming=True,
 ) -> list[str]:
+    # Cada etapa continua independente para permitir experimentos de ablação.
     tokens = (
         word_tokenize(texto, language="portuguese")
         if tokenizar
@@ -38,11 +40,13 @@ def normalizar(
 
     if remover_stopwords:
         stop = set(stopwords.words("portuguese"))
+        # A lista precisa usar a mesma representação dos tokens sem acentos.
         if remover_acentos:
             stop = {_remover_acentos(palavra) for palavra in stop}
         tokens = [token for token in tokens if token not in stop]
 
     if aplicar_stemming:
+        # O RSLP aproxima flexões em português; o resultado é um radical, não uma palavra.
         stemmer = RSLPStemmer()
         tokens = [stemmer.stem(token) for token in tokens]
 
