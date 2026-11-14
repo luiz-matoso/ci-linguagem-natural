@@ -4,11 +4,11 @@ import argparse
 import csv
 from pathlib import Path
 
-from chatbot_denso import (
+from src.chatbot_denso import (
     ChatbotDenso, LIMIAR_DENSO_PADRAO, MODELO_ALTERNATIVO, MODELO_PADRAO,
     REVISAO_MODELO_PADRAO, REVISOES_MODELOS,
 )
-from chatbot_tfidf import ChatbotTFIDF, LIMIAR_PADRAO
+from src.chatbot_tfidf import ChatbotTFIDF, LIMIAR_PADRAO
 
 
 RAIZ = Path(__file__).resolve().parent

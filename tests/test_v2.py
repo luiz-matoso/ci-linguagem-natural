@@ -7,8 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
-from chatbot_denso import ChatbotDenso
-from chatbot_tfidf import MAX_CARACTERES, MENSAGEM_REJEICAO
+from src.chatbot_denso import ChatbotDenso
+from src.chatbot_tfidf import MAX_CARACTERES, MENSAGEM_REJEICAO
 
 
 class ModeloFalso:

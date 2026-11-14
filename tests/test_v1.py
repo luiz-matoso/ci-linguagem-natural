@@ -11,8 +11,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from avaliacao import (
     calcular_metricas, calibrar_limiar, carregar_perguntas, obter_resultados,
 )
-from base import carregar_base
-from chatbot_tfidf import (
+from src.base import carregar_base
+from src.chatbot_tfidf import (
     ChatbotTFIDF, MAX_CARACTERES, MENSAGEM_REJEICAO, Resultado, similaridade_cossenos,
 )
 

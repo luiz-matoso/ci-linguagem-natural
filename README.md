@@ -56,8 +56,8 @@ Só há resposta quando o escore é **maior** que o limiar. Entradas acima de
 ## Usar pelo código
 
 ```python
-from chatbot_tfidf import ChatbotTFIDF
-from chatbot_denso import ChatbotDenso
+from src.chatbot_tfidf import ChatbotTFIDF
+from src.chatbot_denso import ChatbotDenso
 
 assistente = ChatbotTFIDF()
 # ou: assistente = ChatbotDenso()
@@ -100,17 +100,17 @@ estão em [docs/decisoes.md](docs/decisoes.md).
 
 ## Organização
 
-- `normalizacao.py`: pipeline configurável da v0.
-- `base.py`: leitura e validação do CSV de conhecimento.
-- `chatbot_tfidf.py`: v1, cosseno e contrato de resposta.
-- `chatbot_denso.py`: v2, embeddings densos e cache invalidável.
+- `src/normalizacao.py`: pipeline configurável da v0.
+- `src/base.py`: leitura e validação do CSV de conhecimento.
+- `src/chatbot_tfidf.py`: v1, cosseno e contrato de resposta.
+- `src/chatbot_denso.py`: v2, embeddings densos e cache invalidável.
+- `src/__init__.py`: definição do pacote Python.
 - `chat.py`: interface de terminal.
 - `avaliacao.py`: calibração e métricas.
 - `data/`: base, validação e teste separados.
 - `tests/`: testes automatizados da v1 e da v2 com `unittest`.
 - `resultados/`: resultados gerados pela avaliação.
-- `docs/decisoes.md`: decisões e exemplos originais da v0.
-- `dedisoes.md`: histórico detalhado da implementação da v1.
+- `docs/decisoes.md`: decisões consolidadas da v0, v1 e v2, experimentos e análise de erros.
 
 O bônus opcional permanece fora do escopo desta etapa.
 

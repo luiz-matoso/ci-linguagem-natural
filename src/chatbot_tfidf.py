@@ -6,8 +6,8 @@ from functools import partial
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from base import BASE_PADRAO, carregar_base
-from normalizacao import normalizar
+from .base import BASE_PADRAO, carregar_base
+from .normalizacao import normalizar
 
 
 LIMIAR_PADRAO = 0.70  # Escolhido em data/validacao.csv, sem consultar o teste.

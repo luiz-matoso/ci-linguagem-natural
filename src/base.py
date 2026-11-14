@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-BASE_PADRAO = Path(__file__).resolve().parent / "data" / "base.csv"
+BASE_PADRAO = Path(__file__).resolve().parent.parent / "data" / "base.csv"
 
 
 @dataclass(frozen=True)

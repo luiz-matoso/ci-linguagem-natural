@@ -1,137 +1,359 @@
-# Decisões - Trabalho Prático de Linguagem Natural
+# Decisões de Projeto
 
-As decisões da implementação da v1, a calibração do limiar e a análise de
-erros estão em [dedisoes.md](../dedisoes.md), nome solicitado para esta etapa.
-Este arquivo preserva o registro original da v0.
+## 1. Contexto e objetivos
 
-## Domínio escolhido
+O projeto implementa um assistente de perguntas frequentes sobre Eleições
+2026. A base contém 50 pares de pergunta e resposta, com fontes registradas
+no arquivo `data/base.csv`. O objetivo é comparar três etapas do trabalho:
 
-O domínio escolhido foi **Eleições 2026**.
+- v0: pipeline configurável de normalização de texto em português;
+- v1: recuperação com TF-IDF e similaridade de cossenos;
+- v2: recuperação com sentence embeddings pré-treinados.
 
-## Perguntas antes e depois do pipeline
+As respostas são recuperadas da base; não há geração de texto por LLM. O
+bônus opcional permanece fora do escopo implementado.
 
-A tabela utiliza a configuração padrão atual da função: conversão para
-minúsculas, remoção de pontuação, remoção de acentos, remoção de stopwords e
-stemming.
+O desenvolvimento ocorreu em etapas. Durante a implementação da v1, os
+módulos estavam na raiz e a v2 ainda não existia. Depois da conclusão da v2,
+os módulos de domínio foram reunidos no pacote `src`, sem alterar os
+algoritmos. `chat.py` e `avaliacao.py` permanecem como pontos de entrada na
+raiz. Não foram introduzidas camadas de serviços, bancos de dados, interfaces
+web ou hierarquias de classes adicionais.
 
-|  ID | Pergunta                                                   | Resposta                                                                                                                                                                                        | Tokens depois da normalização                               |
-| --: | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-|   1 | Qual é a data do primeiro turno das Eleições 2026?         | O primeiro turno das Eleições 2026 será realizado em 4 de outubro de 2026.                                                                                                                      | `['dat', 'prim', 'turn', 'eleico', '2026']`                 |
-|   2 | Qual é a data do segundo turno das Eleições 2026?          | O eventual segundo turno será realizado em 25 de outubro de 2026.                                                                                                                               | `['dat', 'segund', 'turn', 'eleico', '2026']`               |
-|   3 | Qual é o horário da votação nas Eleições 2026?             | A votação ocorrerá das 8h às 17h, pelo horário de Brasília.                                                                                                                                     | `['horari', 'votaca', 'eleico', '2026']`                    |
-|   4 | Quais cargos serão escolhidos no primeiro turno de 2026?   | No primeiro turno serão escolhidos presidente e vice-presidente da República, governador e vice-governador, dois senadores e seus suplentes, deputado federal e deputado estadual ou distrital. | `['qual', 'carg', 'escolh', 'prim', 'turn', '2026']`        |
-|   5 | Quantas escolhas o eleitor fará na urna no primeiro turno? | O eleitor fará seis escolhas: deputado federal, deputado estadual ou distrital, primeiro senador, segundo senador, governador e presidente da República.                                        | `['quant', 'escolh', 'elei', 'far', 'urn', 'prim', 'turn']` |
+## 2. Base de conhecimento e conjuntos de dados
 
-## Decisão sobre negação
+### 2.1. Base de conhecimento
 
-Nesta versão, palavras de negação não terão tratamento especial. Quando a
-remoção de stopwords estiver ativada, termos como `não`, `nem` e `sem` serão
-removidos conforme a lista padrão do NLTK.
+A base original foi preservada. A leitura usa `csv.DictReader`, da biblioteca
+padrão, e codificação `utf-8-sig`, que aceita o BOM do arquivo original e
+também arquivos UTF-8 sem BOM. Cada registro é representado pela `dataclass`
+imutável `ParFAQ`, com ID, pergunta, resposta e fonte.
 
-Para manter a base coerente com essa decisão, as perguntas foram escritas de
-forma afirmativa, sem depender de negações para definir seu sentido. Essa
-decisão deverá ser revista caso perguntas negativas sejam incluídas futuramente.
+O carregador exige as quatro colunas, campos preenchidos, IDs positivos e
+únicos e pelo menos um registro. Ele não exige exatamente 50 pares, pois
+bases menores são usadas nos testes. Linhas inválidas causam erro explícito;
+não são ignoradas. O caminho padrão é resolvido a partir do pacote, de modo
+que a API não dependa do diretório de trabalho. Um caminho passado por
+`--base` continua relativo ao diretório de quem executa o comando.
 
-## v2 - embeddings densos
+Somente as perguntas são indexadas nas duas versões. Respostas e fontes não
+entram na representação. Essa decisão segue a especificação do assistente e
+evita que respostas longas dominem a comparação, mas impede que termos
+presentes apenas nas respostas auxiliem a recuperação.
 
-### Representação, modelo e reprodutibilidade
+### 2.2. Validação e teste
 
-A v2 indexa somente as perguntas, como a v1, e mantém a mesma interface e o
-mesmo desempate por ID crescente. Ela usa
-`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`, revisão
-`e8f8c211226b894fcb81acc59f3b34ba3efd5f42`, com
-`sentence-transformers 5.7.0`, em CPU. Essa é a arquitetura sugerida no
-enunciado, oferece suporte multilíngue e é menor que a alternativa avaliada.
-Não há geração de texto nem uso de LLM.
+`data/validacao.csv` possui 12 perguntas do escopo e 8 perguntas sem resposta
+na base. Ele é usado para escolher limiares, modelo denso e configuração de
+normalização. Perguntas sobre temas eleitorais sem resposta correspondente
+também são consideradas fora do escopo.
 
-Para conferir a escolha, comparamos
-`sentence-transformers/distiluse-base-multilingual-cased-v2`, revisão
-`bfe45d0732ca50787611c0fe107ba278c7f3f889`. Os quatro experimentos abaixo
-usaram somente a validação. Cada configuração recebeu seu próprio limiar,
-escolhido na mesma grade e pelo mesmo objetivo da v1: média entre acertos de
-ranking aceitos no escopo e rejeições corretas fora do escopo.
+`data/teste.csv` possui 30 paráfrases do escopo e 5 perguntas fora dele. Há
+variações de registro, ordem, sinônimos e escrita informal, incluindo o erro
+`pagra` e a grafia `e-titulo`. Perguntas de validação e teste não se repetem e
+não são cópias literais das perguntas da base.
+
+Os conjuntos foram preparados com acesso à base, sem autoria independente.
+Isso pode introduzir viés. Há poucos exemplos de rejeição, e nem todos os IDs
+da base aparecem no teste; os resultados são uma avaliação do conjunto
+entregue, não uma estimativa geral de desempenho.
+
+## 3. v0 - Pipeline de normalização
+
+### 3.1. Etapas do pipeline
+
+A função `normalizar` devolve uma lista de tokens e permite ativar ou desativar
+separadamente:
+
+- tokenização com NLTK em português;
+- conversão para minúsculas;
+- remoção de tokens de pontuação;
+- remoção de acentos;
+- remoção de stopwords do NLTK;
+- stemming com `RSLPStemmer`.
+
+Tokens inteiramente não alfanuméricos são descartados, sem reescrever
+caracteres internos de tokens mistos. Números são preservados porque anos,
+turnos e quantidades são relevantes no domínio.
+
+### 3.2. Justificativas
+
+A tokenização separa unidades textuais. Minúsculas e remoção de acentos
+reduzem variações de escrita. A filtragem de pontuação retira elementos sem
+conteúdo alfanumérico. A remoção de stopwords reduz palavras funcionais, e o
+RSLP aproxima algumas flexões sem exigir um modelo externo de lematização.
+Essas decisões reduzem o vocabulário da v1, mas não implicam que todas as
+etapas sejam adequadas para embeddings densos.
+
+### 3.3. Exemplos antes e depois
+
+A tabela usa a configuração padrão completa.
+
+| ID | Pergunta | Resposta | Tokens normalizados |
+| ---: | --- | --- | --- |
+| 1 | Qual é a data do primeiro turno das Eleições 2026? | O primeiro turno das Eleições 2026 será realizado em 4 de outubro de 2026. | `['dat', 'prim', 'turn', 'eleico', '2026']` |
+| 2 | Qual é a data do segundo turno das Eleições 2026? | O eventual segundo turno será realizado em 25 de outubro de 2026. | `['dat', 'segund', 'turn', 'eleico', '2026']` |
+| 3 | Qual é o horário da votação nas Eleições 2026? | A votação ocorrerá das 8h às 17h, pelo horário de Brasília. | `['horari', 'votaca', 'eleico', '2026']` |
+| 4 | Quais cargos serão escolhidos no primeiro turno de 2026? | No primeiro turno serão escolhidos presidente e vice-presidente da República, governador e vice-governador, dois senadores e seus suplentes, deputado federal e deputado estadual ou distrital. | `['qual', 'carg', 'escolh', 'prim', 'turn', '2026']` |
+| 5 | Quantas escolhas o eleitor fará na urna no primeiro turno? | O eleitor fará seis escolhas: deputado federal, deputado estadual ou distrital, primeiro senador, segundo senador, governador e presidente da República. | `['quant', 'escolh', 'elei', 'far', 'urn', 'prim', 'turn']` |
+
+### 3.4. Limitações e perda de informação
+
+A lista padrão de stopwords é mantida. Quando essa etapa está ativa, termos
+como `não`, `nem` e `sem` são removidos. Isso pode inverter ou apagar parte do
+sentido de perguntas negativas, e o limiar de rejeição não corrige essa perda.
+A base foi escrita majoritariamente de forma afirmativa, mas a limitação deve
+ser revista se perguntas negativas forem incorporadas.
+
+Não há exceções para siglas ou termos como `e-Título`. Caixa e acentos deixam
+de distingui-los, e o RSLP pode fundir palavras de sentidos diferentes ou não
+aproximar flexões relacionadas. A v1 aceita opções alternativas pelo parâmetro
+`opcoes_normalizacao`, mas o limiar registrado corresponde à configuração
+padrão completa.
+
+## 4. v1 - Recuperação com TF-IDF
+
+### 4.1. Representação dos documentos
+
+A v1 usa `TfidfVectorizer` ajustado somente sobre as perguntas da base. A
+função `normalizar` é fornecida como analisador por `functools.partial`, sem
+uma segunda tokenização ou conversão de caixa pelo scikit-learn.
+
+São usados unigramas, frequência bruta, IDF suavizado e normalização L2,
+configurações padrão do vetorizador. Para N documentos, o IDF segue a variante
+`log((1 + N) / (1 + df(t))) + 1`. Não são usados TF sublinear, bigramas,
+dicionários de sinônimos, correção ortográfica ou expansão de consultas.
+
+O vocabulário e o IDF são ajustados uma vez por instância. Consultas usam
+apenas `transform` e não alteram esses valores. A matriz da base é convertida
+para um array NumPy denso; com 50 perguntas, isso simplifica o cálculo. A v1
+não mantém cache em disco. Uma base que produza vocabulário vazio gera erro
+controlado.
+
+### 4.2. Similaridade, ranking e contrato
+
+A similaridade de cossenos foi implementada com NumPy: produto matricial,
+normas L2 e divisão pelo produto das normas. O código de produção não chama o
+cosseno do scikit-learn. Vetores nulos recebem escore zero, sem divisão por
+zero ou `NaN`, e o resultado é limitado ao intervalo [-1, 1] para compensar
+pequenos erros numéricos.
+
+Os testes comparam a implementação com
+`sklearn.metrics.pairwise.cosine_similarity`, inclusive para vetores nulos e
+aleatórios, com tolerâncias absoluta e relativa de `1e-12`.
+
+As versões retornam `Resultado(resposta, id, escore, ranking)`. O ranking
+contém todos os pares, em escore decrescente. Empates exatos são resolvidos
+por ID crescente, sem arredondamento ou tolerância. Pares com respostas iguais
+permanecem distintos: a avaliação usa o ID esperado e não concede crédito a
+outro ID apenas por compartilhar a resposta.
+
+Quando o melhor escore não supera o limiar, o ID retornado é -1 e a mensagem é
+`Desculpe, não entendi. Pode reformular?`. O melhor escore e o ranking completo
+são mantidos mesmo na rejeição para permitir MRR e análise do limiar.
+
+### 4.3. Limiar de rejeição
+
+A regra é estrita: a resposta só é aceita quando `escore > limiar`; igualdade
+é rejeição. Valores não finitos ou fora de [0, 1] são recusados. Com limiar
+zero, uma consulta com vetor nulo continua rejeitada.
+
+Foram avaliados 21 limiares, de 0,00 a 1,00 em passos de 0,05, somente na
+validação. O objetivo é a média entre acertos de ranking aceitos no escopo e
+rejeições corretas fora do escopo. Empates favorecem o menor limiar para
+reduzir falsas rejeições.
+
+| Limiar | Acertos aceitos no escopo | Rejeição correta | Falsa rejeição | Objetivo |
+| ---: | ---: | ---: | ---: | ---: |
+| 0,50 | 2/12 | 2/8 | 3/12 | 0,2083 |
+| 0,65 | 1/12 | 6/8 | 10/12 | 0,4167 |
+| 0,70 | 1/12 | 8/8 | 10/12 | 0,5417 |
+| 0,75 | 1/12 | 8/8 | 10/12 | 0,5417 |
+| 1,00 | 0/12 | 8/8 | 12/12 | 0,5000 |
+
+O limiar padrão escolhido foi 0,70. A Acurácia@1 da validação foi 2/12 e o
+MRR, 0,4421. Apenas duas consultas ficaram acima de 0,70: uma estava correta
+e a outra recuperou o ID 45 no lugar do 46. O limiar é conservador, não
+corrige erros semânticos e não garante que toda resposta aceita esteja
+correta. Uma validação maior exigiria nova calibração, sem usar o teste atual.
+
+### 4.4. Entradas e limitações
+
+A interface aceita strings. Entradas vazias, espaços, pontuação, emojis e
+vocabulário desconhecido produzem resposta controlada e ranking completo.
+Textos em outros idiomas podem ser rejeitados ou encontrar termos comuns; não
+há detector de idioma. Consultas acima de 10.000 caracteres são rejeitadas
+antes da tokenização, sem truncamento.
+
+O terminal exibe ID, escore com três casas e resposta, e encerra com `sair`,
+Ctrl+C ou fim de arquivo. O arredondamento é apenas visual; cálculos e CSVs
+mantêm a precisão disponível.
+
+## 5. v2 - Recuperação com embeddings densos
+
+### 5.1. Modelo escolhido
+
+A v2 usa `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`,
+revisão `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`, com execução explícita em
+CPU. Nos experimentos registrados, a versão de `sentence-transformers` foi
+5.7.0. O modelo foi sugerido no enunciado, suporta português e é menor que a
+alternativa avaliada.
+
+A alternativa foi `sentence-transformers/distiluse-base-multilingual-cased-v2`,
+revisão `bfe45d0732ca50787611c0fe107ba278c7f3f889`. A comparação foi limitada a
+esses dois modelos compatíveis com português e CPU.
+
+### 5.2. Cache dos embeddings
+
+Os embeddings das 50 perguntas são calculados uma vez e salvos em arquivos
+NumPy compactados sob `.cache/embeddings/`. Consultas calculam apenas o próprio
+embedding. A chave SHA-256 inclui todos os campos da base, os textos
+efetivamente indexados, identificador e revisão do modelo, versão da
+biblioteca e opções de normalização.
+
+Mudanças nesses elementos geram outro artefato. O cache é criado
+automaticamente e não é versionado. Na leitura, metadados e dimensões são
+verificados; um arquivo incompatível ou corrompido causa erro explícito. A
+gravação usa arquivo temporário e substituição atômica.
+
+### 5.3. Normalização e comparação entre modelos
+
+Os quatro experimentos abaixo usaram apenas a validação. Cada configuração
+recebeu seu próprio limiar, escolhido pelo mesmo objetivo da v1.
 
 | Modelo | Texto | Limiar | Acurácia@1 | MRR | Rejeição correta | Falsa rejeição | Objetivo |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| MiniLM | original | **0,80** | 0,8333 | **0,9028** | **1,0000** | 0,3333 | **0,8333** |
+| MiniLM | original | 0,80 | 0,8333 | 0,9028 | 1,0000 | 0,3333 | 0,8333 |
 | MiniLM | normalizado | 0,90 | 0,3333 | 0,5087 | 1,0000 | 0,6667 | 0,6250 |
-| DistilUSE | original | 0,65 | 0,8333 | 0,8799 | 0,7500 | **0,0000** | 0,7917 |
+| DistilUSE | original | 0,65 | 0,8333 | 0,8799 | 0,7500 | 0,0000 | 0,7917 |
 | DistilUSE | normalizado | 0,75 | 0,3333 | 0,4640 | 0,8750 | 0,5000 | 0,5625 |
 
-Escolhemos MiniLM com texto original porque teve o maior objetivo e o maior
+Foi escolhido o MiniLM com texto original por apresentar o maior objetivo e
 MRR, além de rejeitar as 8 perguntas fora do escopo. O DistilUSE original
-aceitou mais consultas válidas, mas rejeitou apenas 6/8 perguntas fora do
-escopo. A validação tem só 20 itens; portanto, essa escolha é evidência local,
-não uma conclusão geral sobre as arquiteturas.
+aceitou mais consultas válidas, mas rejeitou somente 6/8 casos fora do escopo.
+A validação contém apenas 20 itens; a escolha é uma evidência local, não uma
+conclusão geral sobre as arquiteturas.
 
-### Ablação de normalização
+Aplicar o pipeline completo da v0 reduziu a Acurácia@1 de ambos os modelos de
+0,8333 para 0,3333. No MiniLM, o MRR caiu de 0,9028 para 0,5087. A configuração
+final mantém o texto natural nos dois lados da recuperação. A hipótese é que
+Transformers treinados com frases naturais utilizam palavras funcionais,
+flexões e contexto, enquanto o RSLP e a remoção de stopwords eliminam essas
+pistas. Esse contraste constitui o experimento de ablação.
 
-O pipeline completo da v0 remove acentos, stopwords e aplica stemming. Nos
-dois modelos, aplicá-lo reduziu Acurácia@1 na validação de 0,8333 para 0,3333.
-No MiniLM, o MRR caiu de 0,9028 para 0,5087. Mantivemos o texto natural nos
-dois lados da recuperação. A hipótese é que os Transformers foram treinados
-com frases naturais e usam palavras funcionais, flexões e contexto; radicais
-RSLP como `eleico` e a remoção de negações destroem pistas que o modelo sabe
-representar. Este contraste funciona como a ablação exigida pelo enunciado.
+### 5.4. Limiar de rejeição
 
-### Cache de embeddings
+Na validação, o limiar 0,80 maximizou o objetivo em 0,8333. Ele aceitou 8/12
+acertos de ranking, rejeitou 8/8 casos fora do escopo e rejeitou falsamente
+4/12 perguntas válidas. Em 0,65, a falsa rejeição era zero, mas apenas 6/8
+casos fora do escopo eram rejeitados. A decisão favorece não responder fora
+da base e pode exigir nova calibração se os dados mudarem.
 
-Os 50 embeddings da base são calculados uma vez e persistidos em arquivos
-NumPy compactados sob `.cache/embeddings/`. A chave SHA-256 inclui todos os
-campos da base, textos efetivamente indexados, identificador e revisão do
-modelo, versão da `sentence-transformers` e opções de normalização. Qualquer
-mudança nesses elementos cria outro artefato; consultas reutilizam o cache e
-calculam apenas um embedding. O cache é gerado automaticamente e não é
-versionado. Metadados e dimensões são verificados na leitura; cache corrompido
-gera erro explícito, em vez de produzir um ranking silenciosamente incorreto.
+## 6. Avaliação experimental
 
-### Limiar da v2
+### 6.1. Metodologia e métricas
 
-A grade de 0,00 a 1,00, passo 0,05, foi executada exclusivamente nas 12
-perguntas válidas e 8 fora do escopo de `data/validacao.csv`. O limiar 0,80
-maximizou o objetivo em 0,8333: aceitou 8/12 acertos de ranking, rejeitou 8/8
-casos fora do escopo e rejeitou falsamente 4/12 válidos. Em 0,65, a falsa
-rejeição era zero, mas somente 6/8 casos fora do escopo eram rejeitados. A
-escolha conservadora favorece não responder fora da base. Ela não corrige
-erros de ranking e pode precisar de nova calibração se a base ou a população
-de consultas mudar.
+Modelo, normalização e limiares foram definidos na validação antes da avaliação
+final. O teste não é usado para ajustar parâmetros. O script valida as colunas,
+perguntas preenchidas e IDs existentes e exige casos dentro e fora do escopo.
 
-### Comparação final no teste
+As métricas são:
 
-Modelo, normalização e limiar foram fixados antes de abrir o teste. O script
-gerou automaticamente:
+- Acurácia@1: proporção das 30 perguntas do escopo cujo primeiro ID do ranking
+  é o esperado, independentemente da rejeição;
+- MRR: média do recíproco da posição do ID esperado no ranking completo;
+- rejeição correta: proporção das 5 perguntas fora do escopo rejeitadas;
+- falsa rejeição: proporção das 30 perguntas válidas rejeitadas pelo limiar.
+
+### 6.2. Comparação entre v1 e v2
 
 | Versão | Limiar | Acurácia@1 | MRR | Rejeição correta | Falsa rejeição |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | v1 | 0,70 | 0,6667 (20/30) | 0,7414 | 1,0000 (5/5) | 0,6667 (20/30) |
 | v2 | 0,80 | 0,8000 (24/30) | 0,8628 | 1,0000 (5/5) | 0,6000 (18/30) |
 
-A v2 melhorou o ranking e reduziu a falsa rejeição, mas ainda recusou 18 das
-30 perguntas válidas. Isso mostra a tensão entre rejeição correta e cobertura:
-um embedding semanticamente melhor não elimina a necessidade de calibrar o
-limiar, e o conjunto de validação pequeno favoreceu uma política conservadora.
+Na v1, somente 10 das 30 consultas válidas receberam resposta, embora o
+ranking acertasse 20. Todas as 10 respostas aceitas estavam corretas neste
+teste. Isso não equivale a 66,67% de atendimento: esse valor descreve o
+ranking antes da rejeição.
 
-### Análise de erros observados
+A v2 melhorou Acurácia@1 e MRR e reduziu a falsa rejeição, mas ainda recusou
+18 das 30 perguntas válidas. O resultado evidencia a relação entre cobertura
+e rejeição: uma representação semântica melhor não elimina a necessidade de
+calibrar o limiar.
 
-Há 8 casos em que o primeiro item da v2 é correto e o da v1 é incorreto. Três
-exemplos representativos são:
+### 6.3. Erros e acertos observados na v1
+
+| Pergunta | Esperado | Primeiro ID v1 | Escore | Saída | Hipótese |
+| --- | ---: | ---: | ---: | --- | --- |
+| Quando será a segunda rodada da eleição deste ano de 2026? | 2 | 2 | 0,4051 | Rejeição | A paráfrase perde `data`, `segundo` e `turno`; o ranking acerta, mas o escore fica abaixo do limiar. |
+| Que funções públicas serão eleitas no primeiro turno? | 4 | 1 | 0,6040 | Rejeição | `Funções públicas` não coincide com `cargos`, e os termos de turno favorecem outra pergunta. |
+| Como faço meu cadastro eleitoral pela primeira vez? | 15 | 35 | 0,6448 | Rejeição | `Primeira vez` aproxima lexicalmente a consulta do primeiro acesso ao e-Título. |
+| Uma certidão de nascimento serve para me identificar na eleição? | 31 | 33 | 0,4369 | Rejeição | `Certidão` aparece na resposta do ID 31, mas não na pergunta indexada. |
+| Minha fotografia sumiu do e-titulo. O que faço? | 36 | 34 | 0,5598 | Rejeição | `Fotografia` e `sumiu` não coincidem com `foto` e `ausente`. |
+
+A consulta `Como faço pra pagra minha multa eleitoral?` foi aceita com ID 41
+e escore 0,7620. O erro de digitação não foi corrigido; os demais termos foram
+suficientes. Já `Como pagar o boleto da mensalidade da faculdade?` obteve
+0,6476 no ID 41 e foi rejeitada pelo limiar 0,70, apesar da sobreposição de
+vocabulário.
+
+### 6.4. Casos em que a v2 acerta e a v1 erra
+
+Foram observados 8 casos nesse sentido. Três exemplos são:
 
 | Pergunta | Esperado | v1 | v2 | Hipótese |
 | --- | ---: | ---: | ---: | --- |
 | Que funções públicas serão eleitas no primeiro turno? | 4 | 1 | 4 | O embedding aproxima `funções públicas` de `cargos`; o TF-IDF se apoia em `primeiro turno` e favorece a data. |
-| Como faço meu cadastro eleitoral pela primeira vez? | 15 | 35 | 15 | A v2 relaciona cadastro ao primeiro título; a v1 associa literalmente `primeira vez` ao primeiro acesso ao aplicativo. |
-| Uma certidão de nascimento serve para me identificar na eleição? | 31 | 33 | 31 | A v2 captura a intenção de documento inválido; a v1 encontra vocabulário eleitoral genérico e aponta serviços do e-Título. |
+| Como faço meu cadastro eleitoral pela primeira vez? | 15 | 35 | 15 | A v2 relaciona cadastro ao primeiro título; a v1 associa `primeira vez` ao primeiro acesso ao aplicativo. |
+| Uma certidão de nascimento serve para me identificar na eleição? | 31 | 33 | 31 | A v2 representa a intenção de documento inválido; a v1 encontra vocabulário eleitoral genérico. |
 
-Há 4 casos no sentido contrário, portanto foi possível registrar ao menos três:
+### 6.5. Casos em que a v1 acerta e a v2 erra
+
+Foram observados 4 casos nesse sentido. Três exemplos são:
 
 | Pergunta | Esperado | v1 | v2 | Hipótese |
 | --- | ---: | ---: | ---: | --- |
-| Quais requisitos preciso cumprir pra transferir o título? | 19 | 19 | 18 | Os IDs 18 e 19 são semanticamente quase duplicados; a v1 preserva a pista lexical `requisitos/condições`, enquanto a v2 aproxima a ação geral de transferir. |
-| Quais documentos com foto eu posso levar no dia de votar? | 28 | 28 | 30 | A menção a `foto` aproxima a v2 da pergunta específica sobre documento vencido; o TF-IDF mantém o foco na lista de documentos. |
-| Minha identidade está vencida. Ela ainda vale para votar? | 30 | 30 | 12 | A v1 casa os termos raros `vencida` e `votar`; o embedding perde a condição documental e aproxima a pergunta de elegibilidade do voto. |
+| Quais requisitos preciso cumprir pra transferir o título? | 19 | 19 | 18 | Os IDs 18 e 19 são semanticamente próximos; a v1 preserva `requisitos/condições`, enquanto a v2 favorece a ação geral de transferir. |
+| Quais documentos com foto eu posso levar no dia de votar? | 28 | 28 | 30 | `Foto` aproxima a v2 da pergunta específica sobre documento vencido; o TF-IDF mantém o foco na lista de documentos. |
+| Minha identidade está vencida. Ela ainda vale para votar? | 30 | 30 | 12 | A v1 casa `vencida` e `votar`; o embedding perde a condição documental e aproxima a pergunta de elegibilidade. |
 
-Esses casos sustentam a leitura esperada no enunciado: embeddings lidam melhor
-com sinonímia e reformulações, enquanto TF-IDF pode vencer quando uma pista
-lexical rara ou uma distinção muito fina entre perguntas próximas é decisiva.
-Os IDs 18/19 também mostram que respostas/perguntas semanticamente próximas
-continuam sendo pares distintos; o MRR usa o ID esperado, sem fundi-los.
+Os resultados mostram que embeddings lidam melhor com sinonímia e
+reformulações, enquanto TF-IDF pode ser superior quando uma pista lexical rara
+ou uma distinção fina entre perguntas próximas é decisiva. Os IDs 18 e 19
+permanecem pares distintos; o MRR usa o ID esperado, sem fundi-los.
+
+## 7. Reprodutibilidade, testes e limitações
+
+O projeto requer Python 3.10 ou superior e execução em CPU. As dependências de
+produção são NLTK, NumPy, scikit-learn e sentence-transformers; PyTorch é
+instalado como dependência desta última. Recursos `punkt_tab`, `stopwords` e
+`rslp` são baixados explicitamente. O leitor de PDF usado durante a consulta
+ao enunciado não integra as dependências do aplicativo.
+
+Na etapa da v1, o `requirements.txt` foi convertido de UTF-16 para UTF-8. Ele
+mantém NLTK 3.10.4 e faixas compatíveis de NumPy e scikit-learn; a v2 acrescenta
+sentence-transformers. Não foram adicionados pandas, pytest ou dependências
+sem uso no aplicativo. As tabelas em `resultados/` são geradas pelos scripts
+de calibração e avaliação, e não calculadas manualmente.
+
+O ambiente da avaliação final usou Python 3.13.9, NLTK 3.10.4, NumPy 2.5.4,
+scikit-learn 1.9.1, sentence-transformers 5.7.0 e PyTorch 2.15.0+cpu. Outras
+combinações aceitas pelo `requirements.txt` podem apresentar pequenas
+diferenças numéricas.
+
+O chatbot e a avaliação não usam aleatoriedade. Testes com vetores aleatórios
+fixam a semente 42, e o desempate por ID torna o ranking determinístico. Na
+etapa da v1, havia 16 testes automatizados. Após a v2, a suíte passou a ter 22
+testes, incluindo interface, ranking, limiar, persistência e invalidação de
+cache, entradas especiais e execução em CPU.
+
+Os resultados pequenos em `resultados/` são versionados para inspeção e
+reprodução. Ambientes virtuais, bytecode, recursos locais do NLTK, caches de
+embeddings e arquivos temporários não são versionados.
+
+As principais limitações são o tamanho dos conjuntos de validação e teste, o
+viés possível na elaboração das perguntas, a remoção de negação na
+normalização padrão, a indexação exclusiva das perguntas e a dificuldade de
+distinguir pares semanticamente muito próximos. Os resultados devem ser
+interpretados dentro desse conjunto experimental.

@@ -10,11 +10,11 @@ from pathlib import Path
 
 import numpy as np
 
-from base import BASE_PADRAO, carregar_base
-from chatbot_tfidf import (
+from .base import BASE_PADRAO, carregar_base
+from .chatbot_tfidf import (
     MAX_CARACTERES, MENSAGEM_REJEICAO, Resultado, similaridade_cossenos,
 )
-from normalizacao import normalizar
+from .normalizacao import normalizar
 
 
 MODELO_PADRAO = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -25,7 +25,7 @@ REVISOES_MODELOS = {
 }
 REVISAO_MODELO_PADRAO = REVISOES_MODELOS[MODELO_PADRAO]
 LIMIAR_DENSO_PADRAO = 0.80  # Escolhido somente em data/validacao.csv.
-CACHE_PADRAO = Path(__file__).resolve().parent / ".cache" / "embeddings"
+CACHE_PADRAO = Path(__file__).resolve().parent.parent / ".cache" / "embeddings"
 
 
 def _versao_pacote() -> str:

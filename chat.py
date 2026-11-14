@@ -2,9 +2,9 @@
 
 import argparse
 
-from base import BASE_PADRAO
-from chatbot_denso import ChatbotDenso, LIMIAR_DENSO_PADRAO
-from chatbot_tfidf import ChatbotTFIDF, LIMIAR_PADRAO, MAX_CARACTERES
+from src.base import BASE_PADRAO
+from src.chatbot_denso import ChatbotDenso, LIMIAR_DENSO_PADRAO
+from src.chatbot_tfidf import ChatbotTFIDF, LIMIAR_PADRAO, MAX_CARACTERES
 
 
 def main():
