@@ -4,6 +4,8 @@ Assistente de FAQ sobre **Eleições 2026**, com 50 pares de pergunta e resposta
 A v0 normaliza textos em português. A v1 recupera respostas com TF-IDF e a
 v2 usa embeddings densos pré-treinados. Ambas compartilham a similaridade de
 cossenos implementada em NumPy, o contrato de resposta e o ranking completo.
+O bônus RAG opcional usa a resposta recuperada pela v2 como contexto para uma
+reformulação curta por LLM.
 
 ## Instalação
 
@@ -18,7 +20,8 @@ python -m nltk.downloader -d .venv/nltk_data punkt_tab stopwords rslp
 ```
 
 Os recursos do NLTK ficam dentro do ambiente virtual. A instalação precisa
-de internet; o chatbot e a avaliação executam localmente depois disso.
+de internet; v1, v2 e a avaliação executam localmente depois disso. O bônus
+RAG também precisa de acesso à API durante a reformulação.
 
 Na primeira execução da v2, a `sentence-transformers` baixa o modelo fixado no
 código. Os pesos ficam no cache local do Hugging Face; os embeddings da base
@@ -52,6 +55,37 @@ python chat.py --versao v2 --limiar 0.75 --base data/base.csv
 
 Só há resposta quando o escore é **maior** que o limiar. Entradas acima de
 10.000 caracteres são rejeitadas com uma orientação para encurtar a pergunta.
+
+## Bônus RAG simples
+
+O RAG mantém a recuperação da v2 e envia apenas a pergunta e a resposta
+recuperada ao OpenRouter, usando o modelo gratuito
+`nvidia/nemotron-3.5-lightning:free`. O LLM reformula o texto, sem escolher
+outro item da base. Se a v2 rejeitar a pergunta, a API não é acionada.
+
+Crie uma chave em [OpenRouter Keys](https://openrouter.ai/keys) e salve na raiz
+um arquivo `.env`, que é ignorado pelo Git:
+
+```env
+OPENROUTER_API_KEY=sua-chave
+OPENROUTER_MODEL=nvidia/nemotron-3.5-lightning:free
+```
+
+Execute:
+
+```bash
+python chat.py --versao rag
+```
+
+O terminal carrega o `.env` automaticamente e mostra a resposta original da
+v2 e a reformulação. Se a chave estiver ausente, o provedor falhar ou retornar
+texto vazio, a resposta original é preservada e uma mensagem controlada é
+exibida.
+
+O endpoint `:free` não cobra tokens, mas possui limites de requisição e pode
+ter disponibilidade variável. Não envie dados pessoais ou confidenciais ao
+modelo gratuito. O SDK `openai` é utilizado apenas como cliente compatível,
+apontando para `https://openrouter.ai/api/v1`.
 
 ## Usar pelo código
 
@@ -104,6 +138,7 @@ estão em [docs/decisoes.md](docs/decisoes.md).
 - `src/base.py`: leitura e validação do CSV de conhecimento.
 - `src/chatbot_tfidf.py`: v1, cosseno e contrato de resposta.
 - `src/chatbot_denso.py`: v2, embeddings densos e cache invalidável.
+- `src/chatbot_rag.py`: integração opcional entre v2 e o OpenRouter.
 - `src/__init__.py`: definição do pacote Python.
 - `chat.py`: interface de terminal.
 - `avaliacao.py`: calibração e métricas.
@@ -112,7 +147,11 @@ estão em [docs/decisoes.md](docs/decisoes.md).
 - `resultados/`: resultados gerados pela avaliação.
 - `docs/decisoes.md`: decisões consolidadas da v0, v1 e v2, experimentos e análise de erros.
 
-O bônus opcional permanece fora do escopo desta etapa.
+A avaliação experimental do bônus RAG está registrada em
+[resultados/avaliacao_rag.md](resultados/avaliacao_rag.md), com 11 execuções,
+três melhorias selecionadas, uma distorção principal e uma distorção
+adicional. A análise está consolidada na Seção 8 de
+[docs/decisoes.md](docs/decisoes.md#8-avaliação-experimental-do-bônus-rag).
 
 ## Fontes da base
 

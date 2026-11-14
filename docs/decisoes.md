@@ -2,8 +2,7 @@
 
 ## 1. Contexto e objetivos
 
-O projeto implementa um assistente de perguntas frequentes sobre Eleições
-2026. A base contém 50 pares de pergunta e resposta, com fontes registradas
+O projeto implementa um assistente de perguntas frequentes sobre Eleições 2026. A base contém 50 pares de pergunta e resposta, com fontes registradas
 no arquivo `data/base.csv`. O objetivo é comparar três etapas do trabalho:
 
 - v0: pipeline configurável de normalização de texto em português;
@@ -89,13 +88,13 @@ etapas sejam adequadas para embeddings densos.
 
 A tabela usa a configuração padrão completa.
 
-| ID | Pergunta | Resposta | Tokens normalizados |
-| ---: | --- | --- | --- |
-| 1 | Qual é a data do primeiro turno das Eleições 2026? | O primeiro turno das Eleições 2026 será realizado em 4 de outubro de 2026. | `['dat', 'prim', 'turn', 'eleico', '2026']` |
-| 2 | Qual é a data do segundo turno das Eleições 2026? | O eventual segundo turno será realizado em 25 de outubro de 2026. | `['dat', 'segund', 'turn', 'eleico', '2026']` |
-| 3 | Qual é o horário da votação nas Eleições 2026? | A votação ocorrerá das 8h às 17h, pelo horário de Brasília. | `['horari', 'votaca', 'eleico', '2026']` |
-| 4 | Quais cargos serão escolhidos no primeiro turno de 2026? | No primeiro turno serão escolhidos presidente e vice-presidente da República, governador e vice-governador, dois senadores e seus suplentes, deputado federal e deputado estadual ou distrital. | `['qual', 'carg', 'escolh', 'prim', 'turn', '2026']` |
-| 5 | Quantas escolhas o eleitor fará na urna no primeiro turno? | O eleitor fará seis escolhas: deputado federal, deputado estadual ou distrital, primeiro senador, segundo senador, governador e presidente da República. | `['quant', 'escolh', 'elei', 'far', 'urn', 'prim', 'turn']` |
+|  ID | Pergunta                                                   | Resposta                                                                                                                                                                                        | Tokens normalizados                                         |
+| --: | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+|   1 | Qual é a data do primeiro turno das Eleições 2026?         | O primeiro turno das Eleições 2026 será realizado em 4 de outubro de 2026.                                                                                                                      | `['dat', 'prim', 'turn', 'eleico', '2026']`                 |
+|   2 | Qual é a data do segundo turno das Eleições 2026?          | O eventual segundo turno será realizado em 25 de outubro de 2026.                                                                                                                               | `['dat', 'segund', 'turn', 'eleico', '2026']`               |
+|   3 | Qual é o horário da votação nas Eleições 2026?             | A votação ocorrerá das 8h às 17h, pelo horário de Brasília.                                                                                                                                     | `['horari', 'votaca', 'eleico', '2026']`                    |
+|   4 | Quais cargos serão escolhidos no primeiro turno de 2026?   | No primeiro turno serão escolhidos presidente e vice-presidente da República, governador e vice-governador, dois senadores e seus suplentes, deputado federal e deputado estadual ou distrital. | `['qual', 'carg', 'escolh', 'prim', 'turn', '2026']`        |
+|   5 | Quantas escolhas o eleitor fará na urna no primeiro turno? | O eleitor fará seis escolhas: deputado federal, deputado estadual ou distrital, primeiro senador, segundo senador, governador e presidente da República.                                        | `['quant', 'escolh', 'elei', 'far', 'urn', 'prim', 'turn']` |
 
 ### 3.4. Limitações e perda de informação
 
@@ -164,12 +163,12 @@ rejeições corretas fora do escopo. Empates favorecem o menor limiar para
 reduzir falsas rejeições.
 
 | Limiar | Acertos aceitos no escopo | Rejeição correta | Falsa rejeição | Objetivo |
-| ---: | ---: | ---: | ---: | ---: |
-| 0,50 | 2/12 | 2/8 | 3/12 | 0,2083 |
-| 0,65 | 1/12 | 6/8 | 10/12 | 0,4167 |
-| 0,70 | 1/12 | 8/8 | 10/12 | 0,5417 |
-| 0,75 | 1/12 | 8/8 | 10/12 | 0,5417 |
-| 1,00 | 0/12 | 8/8 | 12/12 | 0,5000 |
+| -----: | ------------------------: | ---------------: | -------------: | -------: |
+|   0,50 |                      2/12 |              2/8 |           3/12 |   0,2083 |
+|   0,65 |                      1/12 |              6/8 |          10/12 |   0,4167 |
+|   0,70 |                      1/12 |              8/8 |          10/12 |   0,5417 |
+|   0,75 |                      1/12 |              8/8 |          10/12 |   0,5417 |
+|   1,00 |                      0/12 |              8/8 |          12/12 |   0,5000 |
 
 O limiar padrão escolhido foi 0,70. A Acurácia@1 da validação foi 2/12 e o
 MRR, 0,4421. Apenas duas consultas ficaram acima de 0,70: uma estava correta
@@ -221,12 +220,12 @@ gravação usa arquivo temporário e substituição atômica.
 Os quatro experimentos abaixo usaram apenas a validação. Cada configuração
 recebeu seu próprio limiar, escolhido pelo mesmo objetivo da v1.
 
-| Modelo | Texto | Limiar | Acurácia@1 | MRR | Rejeição correta | Falsa rejeição | Objetivo |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| MiniLM | original | 0,80 | 0,8333 | 0,9028 | 1,0000 | 0,3333 | 0,8333 |
-| MiniLM | normalizado | 0,90 | 0,3333 | 0,5087 | 1,0000 | 0,6667 | 0,6250 |
-| DistilUSE | original | 0,65 | 0,8333 | 0,8799 | 0,7500 | 0,0000 | 0,7917 |
-| DistilUSE | normalizado | 0,75 | 0,3333 | 0,4640 | 0,8750 | 0,5000 | 0,5625 |
+| Modelo    | Texto       | Limiar | Acurácia@1 |    MRR | Rejeição correta | Falsa rejeição | Objetivo |
+| --------- | ----------- | -----: | ---------: | -----: | ---------------: | -------------: | -------: |
+| MiniLM    | original    |   0,80 |     0,8333 | 0,9028 |           1,0000 |         0,3333 |   0,8333 |
+| MiniLM    | normalizado |   0,90 |     0,3333 | 0,5087 |           1,0000 |         0,6667 |   0,6250 |
+| DistilUSE | original    |   0,65 |     0,8333 | 0,8799 |           0,7500 |         0,0000 |   0,7917 |
+| DistilUSE | normalizado |   0,75 |     0,3333 | 0,4640 |           0,8750 |         0,5000 |   0,5625 |
 
 Foi escolhido o MiniLM com texto original por apresentar o maior objetivo e
 MRR, além de rejeitar as 8 perguntas fora do escopo. O DistilUSE original
@@ -267,10 +266,10 @@ As métricas são:
 
 ### 6.2. Comparação entre v1 e v2
 
-| Versão | Limiar | Acurácia@1 | MRR | Rejeição correta | Falsa rejeição |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| v1 | 0,70 | 0,6667 (20/30) | 0,7414 | 1,0000 (5/5) | 0,6667 (20/30) |
-| v2 | 0,80 | 0,8000 (24/30) | 0,8628 | 1,0000 (5/5) | 0,6000 (18/30) |
+| Versão | Limiar |     Acurácia@1 |    MRR | Rejeição correta | Falsa rejeição |
+| ------ | -----: | -------------: | -----: | ---------------: | -------------: |
+| v1     |   0,70 | 0,6667 (20/30) | 0,7414 |     1,0000 (5/5) | 0,6667 (20/30) |
+| v2     |   0,80 | 0,8000 (24/30) | 0,8628 |     1,0000 (5/5) | 0,6000 (18/30) |
 
 Na v1, somente 10 das 30 consultas válidas receberam resposta, embora o
 ranking acertasse 20. Todas as 10 respostas aceitas estavam corretas neste
@@ -284,13 +283,13 @@ calibrar o limiar.
 
 ### 6.3. Erros e acertos observados na v1
 
-| Pergunta | Esperado | Primeiro ID v1 | Escore | Saída | Hipótese |
-| --- | ---: | ---: | ---: | --- | --- |
-| Quando será a segunda rodada da eleição deste ano de 2026? | 2 | 2 | 0,4051 | Rejeição | A paráfrase perde `data`, `segundo` e `turno`; o ranking acerta, mas o escore fica abaixo do limiar. |
-| Que funções públicas serão eleitas no primeiro turno? | 4 | 1 | 0,6040 | Rejeição | `Funções públicas` não coincide com `cargos`, e os termos de turno favorecem outra pergunta. |
-| Como faço meu cadastro eleitoral pela primeira vez? | 15 | 35 | 0,6448 | Rejeição | `Primeira vez` aproxima lexicalmente a consulta do primeiro acesso ao e-Título. |
-| Uma certidão de nascimento serve para me identificar na eleição? | 31 | 33 | 0,4369 | Rejeição | `Certidão` aparece na resposta do ID 31, mas não na pergunta indexada. |
-| Minha fotografia sumiu do e-titulo. O que faço? | 36 | 34 | 0,5598 | Rejeição | `Fotografia` e `sumiu` não coincidem com `foto` e `ausente`. |
+| Pergunta                                                         | Esperado | Primeiro ID v1 | Escore | Saída    | Hipótese                                                                                             |
+| ---------------------------------------------------------------- | -------: | -------------: | -----: | -------- | ---------------------------------------------------------------------------------------------------- |
+| Quando será a segunda rodada da eleição deste ano de 2026?       |        2 |              2 | 0,4051 | Rejeição | A paráfrase perde `data`, `segundo` e `turno`; o ranking acerta, mas o escore fica abaixo do limiar. |
+| Que funções públicas serão eleitas no primeiro turno?            |        4 |              1 | 0,6040 | Rejeição | `Funções públicas` não coincide com `cargos`, e os termos de turno favorecem outra pergunta.         |
+| Como faço meu cadastro eleitoral pela primeira vez?              |       15 |             35 | 0,6448 | Rejeição | `Primeira vez` aproxima lexicalmente a consulta do primeiro acesso ao e-Título.                      |
+| Uma certidão de nascimento serve para me identificar na eleição? |       31 |             33 | 0,4369 | Rejeição | `Certidão` aparece na resposta do ID 31, mas não na pergunta indexada.                               |
+| Minha fotografia sumiu do e-titulo. O que faço?                  |       36 |             34 | 0,5598 | Rejeição | `Fotografia` e `sumiu` não coincidem com `foto` e `ausente`.                                         |
 
 A consulta `Como faço pra pagra minha multa eleitoral?` foi aceita com ID 41
 e escore 0,7620. O erro de digitação não foi corrigido; os demais termos foram
@@ -302,21 +301,21 @@ vocabulário.
 
 Foram observados 8 casos nesse sentido. Três exemplos são:
 
-| Pergunta | Esperado | v1 | v2 | Hipótese |
-| --- | ---: | ---: | ---: | --- |
-| Que funções públicas serão eleitas no primeiro turno? | 4 | 1 | 4 | O embedding aproxima `funções públicas` de `cargos`; o TF-IDF se apoia em `primeiro turno` e favorece a data. |
-| Como faço meu cadastro eleitoral pela primeira vez? | 15 | 35 | 15 | A v2 relaciona cadastro ao primeiro título; a v1 associa `primeira vez` ao primeiro acesso ao aplicativo. |
-| Uma certidão de nascimento serve para me identificar na eleição? | 31 | 33 | 31 | A v2 representa a intenção de documento inválido; a v1 encontra vocabulário eleitoral genérico. |
+| Pergunta                                                         | Esperado |  v1 |  v2 | Hipótese                                                                                                      |
+| ---------------------------------------------------------------- | -------: | --: | --: | ------------------------------------------------------------------------------------------------------------- |
+| Que funções públicas serão eleitas no primeiro turno?            |        4 |   1 |   4 | O embedding aproxima `funções públicas` de `cargos`; o TF-IDF se apoia em `primeiro turno` e favorece a data. |
+| Como faço meu cadastro eleitoral pela primeira vez?              |       15 |  35 |  15 | A v2 relaciona cadastro ao primeiro título; a v1 associa `primeira vez` ao primeiro acesso ao aplicativo.     |
+| Uma certidão de nascimento serve para me identificar na eleição? |       31 |  33 |  31 | A v2 representa a intenção de documento inválido; a v1 encontra vocabulário eleitoral genérico.               |
 
 ### 6.5. Casos em que a v1 acerta e a v2 erra
 
 Foram observados 4 casos nesse sentido. Três exemplos são:
 
-| Pergunta | Esperado | v1 | v2 | Hipótese |
-| --- | ---: | ---: | ---: | --- |
-| Quais requisitos preciso cumprir pra transferir o título? | 19 | 19 | 18 | Os IDs 18 e 19 são semanticamente próximos; a v1 preserva `requisitos/condições`, enquanto a v2 favorece a ação geral de transferir. |
-| Quais documentos com foto eu posso levar no dia de votar? | 28 | 28 | 30 | `Foto` aproxima a v2 da pergunta específica sobre documento vencido; o TF-IDF mantém o foco na lista de documentos. |
-| Minha identidade está vencida. Ela ainda vale para votar? | 30 | 30 | 12 | A v1 casa `vencida` e `votar`; o embedding perde a condição documental e aproxima a pergunta de elegibilidade. |
+| Pergunta                                                  | Esperado |  v1 |  v2 | Hipótese                                                                                                                             |
+| --------------------------------------------------------- | -------: | --: | --: | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Quais requisitos preciso cumprir pra transferir o título? |       19 |  19 |  18 | Os IDs 18 e 19 são semanticamente próximos; a v1 preserva `requisitos/condições`, enquanto a v2 favorece a ação geral de transferir. |
+| Quais documentos com foto eu posso levar no dia de votar? |       28 |  28 |  30 | `Foto` aproxima a v2 da pergunta específica sobre documento vencido; o TF-IDF mantém o foco na lista de documentos.                  |
+| Minha identidade está vencida. Ela ainda vale para votar? |       30 |  30 |  12 | A v1 casa `vencida` e `votar`; o embedding perde a condição documental e aproxima a pergunta de elegibilidade.                       |
 
 Os resultados mostram que embeddings lidam melhor com sinonímia e
 reformulações, enquanto TF-IDF pode ser superior quando uma pista lexical rara
@@ -357,3 +356,63 @@ viés possível na elaboração das perguntas, a remoção de negação na
 normalização padrão, a indexação exclusiva das perguntas e a dificuldade de
 distinguir pares semanticamente muito próximos. Os resultados devem ser
 interpretados dentro desse conjunto experimental.
+
+## 8. Avaliação experimental do bônus RAG
+
+### 8.1. Procedimento
+
+O bônus encadeia a recuperação densa da v2 com uma chamada ao OpenRouter. A
+pergunta e a resposta recuperada são enviadas ao modelo
+`nvidia/nemotron-3.5-lightning:free`, instruído a reformular o conteúdo sem
+acrescentar fatos. Se a v2 rejeita a pergunta, o LLM não é acionado.
+
+A coleta de 14 de novembro de 2026 preservou base, embeddings, limiar 0,80 e
+prompt. Foram feitas 11 execuções no CLI: uma foi rejeitada pela v2 antes do
+LLM e dez produziram chamadas reais ao OpenRouter. Todos os casos aceitos
+recuperaram a pergunta idêntica da base, com escore 1,000, para separar a
+análise generativa de possíveis erros de recuperação. O registro integral está
+em `resultados/avaliacao_rag.md`.
+
+### 8.2. Três melhorias selecionadas
+
+**Documentos para o primeiro título (ID 16).** A resposta original reúne os
+documentos em um período longo. O LLM os apresentou como lista e manteve o
+documento de identificação, o vínculo com o município, o débito quando houver,
+a quitação militar para conscritos e a selfie no atendimento virtual. A
+melhoria é de organização e localização visual, sem mudança de conteúdo.
+
+**Documento vencido (ID 30).** A resposta manteve a confirmação de que os
+documentos oficiais com foto aceitos pela Justiça Eleitoral podem ser usados
+mesmo vencidos. A reformulação explicitou "para votação" e substituiu "data de
+validade vencida" por "data de validade tenha expirado". Trata-se de melhoria
+modesta de adequação e fluidez, sem novo fato ou condição.
+
+**Primeiro acesso ao e-Título (ID 35).** A sequência original aparece em uma
+única frase. O LLM contextualizou a abertura e separou as etapas em duas
+frases: baixar o aplicativo e informar os dados, depois responder às perguntas
+de segurança e criar uma senha. Todas as etapas foram preservadas, com leitura
+mais direta.
+
+### 8.3. Distorção selecionada
+
+No caso da foto ausente no e-Título (ID 36), a v2 recuperou corretamente a
+resposta da base. O original orienta a pessoa a "refazer a conferência
+biométrica"; o LLM escreveu "refazer o cadastro biométrico" e condicionou essa
+ação a "Caso não esteja" cadastrada e validada. Cadastro e conferência não são
+o mesmo procedimento, e a condição foi introduzida pelo modelo. Portanto, a
+distorção é generativa, não um erro de recuperação.
+
+Também foi observado um caso adicional no ID 19: a retirada da expressão "Em
+regra" transformou condições qualificadas para transferência em uma afirmação
+absoluta. Esse caso foi mantido no registro completo, mas o ID 36 foi escolhido
+como evidência principal por conter alteração procedimental mais explícita.
+
+### 8.4. Limitações
+
+A avaliação é qualitativa e pequena, com uma geração por pergunta. O endpoint
+gratuito tem disponibilidade variável, e novas execuções podem produzir textos
+diferentes. Nem toda reformulação foi melhor: duas foram quase idênticas ao
+original, uma ficou apenas mais longa, uma trocou "pedido" por "autorização",
+outra alterou "solicitada" para "retirada" e uma incluiu comentário
+metalinguístico. A observação de melhorias não elimina o risco de distorção,
+mesmo com instrução explícita para usar exclusivamente a resposta recuperada.
