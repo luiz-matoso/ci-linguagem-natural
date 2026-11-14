@@ -1,8 +1,9 @@
 # Trabalho Prático - Linguagem Natural
 
 Assistente de FAQ sobre **Eleições 2026**, com 50 pares de pergunta e resposta.
-A v0 normaliza textos em português. A v1 recupera respostas com TF-IDF,
-similaridade de cossenos implementada em NumPy e limiar de rejeição.
+A v0 normaliza textos em português. A v1 recupera respostas com TF-IDF e a
+v2 usa embeddings densos pré-treinados. Ambas compartilham a similaridade de
+cossenos implementada em NumPy, o contrato de resposta e o ranking completo.
 
 ## Instalação
 
@@ -10,7 +11,8 @@ Use Python **3.10 ou superior**, em CPU. Na raiz do projeto:
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
+# Linux/macOS: source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python -m nltk.downloader -d .venv/nltk_data punkt_tab stopwords rslp
 ```
@@ -18,10 +20,16 @@ python -m nltk.downloader -d .venv/nltk_data punkt_tab stopwords rslp
 Os recursos do NLTK ficam dentro do ambiente virtual. A instalação precisa
 de internet; o chatbot e a avaliação executam localmente depois disso.
 
-## Conversar com a v1
+Na primeira execução da v2, a `sentence-transformers` baixa o modelo fixado no
+código. Os pesos ficam no cache local do Hugging Face; os embeddings da base
+ficam em `.cache/embeddings/` e são regenerados se base, modelo, revisão,
+versão da biblioteca ou pré-processamento mudar.
+
+## Conversar com a v1 ou v2
 
 ```bash
 python chat.py --versao v1
+python chat.py --versao v2
 ```
 
 Digite uma pergunta e pressione Enter. Use `sair`, Ctrl+C ou fim de arquivo
@@ -34,11 +42,12 @@ para encerrar. Exemplo:
 [v1] (id=-1, escore=0.000) Desculpe, não entendi. Pode reformular?
 ```
 
-O limiar padrão é `0.70`, escolhido em validação. Para experimentar outro
-limiar ou arquivo de base:
+Os limiares padrão, escolhidos separadamente na validação, são `0.70` para v1
+e `0.80` para v2. Para experimentar outro limiar ou arquivo de base:
 
 ```bash
 python chat.py --versao v1 --limiar 0.50 --base data/base.csv
+python chat.py --versao v2 --limiar 0.75 --base data/base.csv
 ```
 
 Só há resposta quando o escore é **maior** que o limiar. Entradas acima de
@@ -48,8 +57,10 @@ Só há resposta quando o escore é **maior** que o limiar. Entradas acima de
 
 ```python
 from chatbot_tfidf import ChatbotTFIDF
+from chatbot_denso import ChatbotDenso
 
 assistente = ChatbotTFIDF()
+# ou: assistente = ChatbotDenso()
 resultado = assistente.responder("Quantos dígitos tem o número para senador?")
 print(resultado.resposta)  # Resposta da base ou mensagem de rejeição.
 print(resultado.id)        # ID do par; -1 se rejeitado.
@@ -65,38 +76,43 @@ Essa mudança altera a representação e exige uma nova calibração para uso re
 
 ```bash
 python -m unittest discover -s tests -v
-python avaliacao.py --calibrar
+python avaliacao.py --experimentos-v2
+python avaliacao.py --calibrar --versao v2
 python avaliacao.py
 ```
 
-A calibração lê somente `data/validacao.csv` (12 perguntas do escopo e 8 de
-rejeição), testa limiares de 0 a 1 com passo 0,05 e grava
-`resultados/calibracao.csv`. Ela informa o limiar escolhido sem editar o código.
+A comparação de configurações e a calibração leem somente
+`data/validacao.csv` (12 perguntas do escopo e 8 de rejeição). O primeiro
+comando compara dois modelos com e sem a normalização da v0 e grava
+`resultados/experimentos_v2.csv`. A calibração testa limiares de 0 a 1 com
+passo 0,05 e grava `resultados/calibracao_v2.csv`.
 
 A avaliação usa `data/teste.csv` (30 paráfrases e 5 perguntas fora do escopo),
-imprime as quatro métricas e grava `resultados/comparacao.csv`, atualmente com
-uma linha para a v1. `python avaliacao.py --limiar 0.50` permite avaliar outro
-limiar, mas o teste não deve ser usado para escolhê-lo.
+imprime as quatro métricas e grava automaticamente as linhas v1 e v2 em
+`resultados/comparacao.csv`. O teste não deve ser usado para escolher modelo,
+normalização ou limiar.
 
-Resultado com o limiar padrão: Acurácia@1 **66,67%**, MRR **0,7414**,
-rejeição correta **100%** e falsa rejeição **66,67%**. Acurácia@1 e MRR medem
-o ranking antes da rejeição. As limitações e os exemplos de erro estão em
-[dedisoes.md](dedisoes.md).
+Resultados com os limiares fixados: v1 obteve Acurácia@1 **66,67%**, MRR
+**0,7414**, rejeição correta **100%** e falsa rejeição **66,67%**; v2 obteve
+**80,00%**, **0,8628**, **100%** e **60,00%**, respectivamente. Acurácia@1 e
+MRR medem o ranking antes da rejeição. As decisões e a análise comparativa
+estão em [docs/decisoes.md](docs/decisoes.md).
 
 ## Organização
 
 - `normalizacao.py`: pipeline configurável da v0.
 - `base.py`: leitura e validação do CSV de conhecimento.
 - `chatbot_tfidf.py`: v1, cosseno e contrato de resposta.
+- `chatbot_denso.py`: v2, embeddings densos e cache invalidável.
 - `chat.py`: interface de terminal.
 - `avaliacao.py`: calibração e métricas.
 - `data/`: base, validação e teste separados.
-- `tests/test_v1.py`: testes automatizados com `unittest`.
+- `tests/`: testes automatizados da v1 e da v2 com `unittest`.
 - `resultados/`: resultados gerados pela avaliação.
 - `docs/decisoes.md`: decisões e exemplos originais da v0.
-- `dedisoes.md`: decisões detalhadas desta implementação da v1.
+- `dedisoes.md`: histórico detalhado da implementação da v1.
 
-A v2 com embeddings e os bônus ficam para a próxima etapa do trabalho.
+O bônus opcional permanece fora do escopo desta etapa.
 
 ## Fontes da base
 
