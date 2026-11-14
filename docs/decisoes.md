@@ -9,8 +9,10 @@ no arquivo `data/base.csv`. O objetivo é comparar três etapas do trabalho:
 - v1: recuperação com TF-IDF e similaridade de cossenos;
 - v2: recuperação com sentence embeddings pré-treinados.
 
-As respostas são recuperadas da base; não há geração de texto por LLM. O
-bônus opcional permanece fora do escopo implementado.
+Nas versões v1 e v2, as respostas são recuperadas da base. O bônus RAG
+implementado acrescenta uma reformulação por LLM à resposta recuperada pela
+v2, preservando a resposta original para comparação. A implementação e as
+evidências experimentais do bônus estão descritas na Seção 8.
 
 O desenvolvimento ocorreu em etapas. Durante a implementação da v1, os
 módulos estavam na raiz e a v2 ainda não existia. Depois da conclusão da v2,
@@ -56,6 +58,16 @@ Os conjuntos foram preparados com acesso à base, sem autoria independente.
 Isso pode introduzir viés. Há poucos exemplos de rejeição, e nem todos os IDs
 da base aparecem no teste; os resultados são uma avaliação do conjunto
 entregue, não uma estimativa geral de desempenho.
+
+Essa limitação não é corrigida ao reescrever o teste depois de conhecer seus
+resultados. Para obter evidência independente em uma próxima coleta, um
+integrante que não escreveu a parte correspondente da base ou um colega de
+outro grupo deve preparar novas perguntas sem consultar os resultados dos
+assistentes. Devem ser registrados autoria, data e procedimento de coleta;
+os IDs esperados devem ser conferidos antes de executar a avaliação. Modelo,
+pipeline e limiares devem ser congelados previamente. O conjunto atual e seus
+resultados ficam preservados como primeira avaliação, sem atribuir a eles uma
+independência que não tiveram.
 
 ## 3. v0 - Pipeline de normalização
 
@@ -238,7 +250,8 @@ Aplicar o pipeline completo da v0 reduziu a Acurácia@1 de ambos os modelos de
 final mantém o texto natural nos dois lados da recuperação. A hipótese é que
 Transformers treinados com frases naturais utilizam palavras funcionais,
 flexões e contexto, enquanto o RSLP e a remoção de stopwords eliminam essas
-pistas. Esse contraste constitui o experimento de ablação.
+pistas. Esse contraste mede a normalização completa. A ablação de uma única
+etapa, para isolar seu efeito, está na Seção 6.6.
 
 ### 5.4. Limiar de rejeição
 
@@ -322,11 +335,45 @@ reformulações, enquanto TF-IDF pode ser superior quando uma pista lexical rara
 ou uma distinção fina entre perguntas próximas é decisiva. Os IDs 18 e 19
 permanecem pares distintos; o MRR usa o ID esperado, sem fundi-los.
 
+### 6.6. Ablação isolada do stemming na v1
+
+O comando `python avaliacao.py --ablacao-v1` compara a configuração completa
+da v0 com outra em que somente `aplicar_stemming=False`. A base, as demais
+etapas, o vetorizador, o cosseno e o limiar 0,70 são mantidos. O TF-IDF é
+ajustado novamente às perguntas da base em cada condição, pois os tokens
+mudam. O experimento lê exclusivamente `data/validacao.csv` (12 perguntas do
+escopo e 8 fora dele) e grava `resultados/ablacao_v1.csv`.
+
+| Stemming RSLP | Limiar | Acurácia@1 | MRR | Rejeição correta | Falsa rejeição |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Ligado | 0,70 | 0,1667 (2/12) | 0,4421 | 1,0000 (8/8) | 0,8333 (10/12) |
+| Desligado | 0,70 | 0,3333 (4/12) | 0,4594 | 1,0000 (8/8) | 0,8333 (10/12) |
+
+Desligar o stemming melhorou o ranking em duas consultas: `Qual a sequência
+dos candidatos na urna?` passou do ID 49 para o esperado 6; `Posso votar
+levando só o título em papel?` passou do ID 42 para o esperado 29. Uma hipótese
+é que preservar as formas das palavras mantém distinções lexicais que o RSLP
+reduz. Isso não demonstra que o stemming seja sempre prejudicial: a validação
+é pequena e o ganho de MRR foi de apenas 0,0173.
+
+As duas correções continuaram abaixo do limiar (escores 0,4545 e 0,4721).
+Assim, melhorar o primeiro item do ranking não alterou as taxas de rejeição.
+O limiar foi mantido fixo para que a comparação medisse apenas a mudança na
+representação; uma recalibração simultânea confundiria os dois efeitos.
+
+Esta ablação complementar foi executada após a avaliação original. Ela não
+foi usada para alterar o pipeline padrão ou selecionar novamente parâmetros:
+as métricas de teste da Seção 6.2 continuam correspondendo à configuração
+original com stemming. Uma futura mudança de configuração exige nova
+calibração em validação e uma avaliação independente, conforme a Seção 2.2.
+
 ## 7. Reprodutibilidade, testes e limitações
 
 O projeto requer Python 3.10 ou superior e execução em CPU. As dependências de
 produção são NLTK, NumPy, scikit-learn e sentence-transformers; PyTorch é
-instalado como dependência desta última. Recursos `punkt_tab`, `stopwords` e
+instalado como dependência desta última. O bônus usa o SDK `openai` como
+cliente da API compatível do OpenRouter e `python-dotenv` para ler a
+configuração local do `.env`. Recursos `punkt_tab`, `stopwords` e
 `rslp` são baixados explicitamente. O leitor de PDF usado durante a consulta
 ao enunciado não integra as dependências do aplicativo.
 
@@ -344,8 +391,11 @@ diferenças numéricas.
 O chatbot e a avaliação não usam aleatoriedade. Testes com vetores aleatórios
 fixam a semente 42, e o desempate por ID torna o ranking determinístico. Na
 etapa da v1, havia 16 testes automatizados. Após a v2, a suíte passou a ter 22
-testes, incluindo interface, ranking, limiar, persistência e invalidação de
-cache, entradas especiais e execução em CPU.
+testes. Com o bônus e a verificação da ablação, a suíte tem 29 testes,
+incluindo interface, ranking, limiar, persistência e invalidação de cache,
+entradas especiais, configuração de CPU e tratamento de falhas da API.
+Os testes da v2 usam embeddings simulados, e os do RAG usam um cliente
+simulado; eles não substituem a execução com o modelo real e a API.
 
 Os resultados pequenos em `resultados/` são versionados para inspeção e
 reprodução. Ambientes virtuais, bytecode, recursos locais do NLTK, caches de
@@ -374,6 +424,22 @@ análise generativa de possíveis erros de recuperação. O registro integral es
 em `resultados/avaliacao_rag.md`.
 
 ### 8.2. Três melhorias selecionadas
+
+A seleção considera organização, fluidez e preservação das informações da
+base. O ganho de apresentação é avaliado separadamente da correção factual:
+uma resposta mais legível que altera um procedimento é classificada como
+distorção. As três melhorias têm intensidades distintas:
+
+| Caso | Ganho observável | Informações preservadas | Intensidade |
+| --- | --- | --- | --- |
+| ID 16 | Lista em lugar de um período longo, facilitando conferir os documentos | Documentos, condições e selfie no atendimento virtual | Clara |
+| ID 30 | Referência explícita à votação e redação mais fluida sobre a validade | Permissão restrita aos documentos oficiais com foto aceitos pela Justiça Eleitoral | Modesta |
+| ID 35 | Sequência dividida em duas frases, facilitando acompanhar as ações | Baixar, informar dados exatos, responder perguntas e criar senha | Modesta |
+
+Os textos originais e as saídas integrais constam em
+`resultados/avaliacao_rag.md`. A classificação dos casos 30 e 35 é qualitativa;
+não foi demonstrado ganho de compreensão por usuários ou avaliadores
+independentes.
 
 **Documentos para o primeiro título (ID 16).** A resposta original reúne os
 documentos em um período longo. O LLM os apresentou como lista e manteve o

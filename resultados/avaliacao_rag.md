@@ -217,3 +217,11 @@ As melhorias selecionadas são as execuções 2, 6 e 10. A distorção seleciona
 é a execução 9. As execuções restantes permanecem registradas para tornar a
 seleção auditável e evitar a classificação automática de toda paráfrase como
 melhoria.
+
+O critério de melhoria é um ganho de organização ou fluidez com preservação
+das informações e condições da base. A execução 2 tem ganho claro de
+organização; as execuções 6 e 10 têm ganhos modestos de redação. Essa é uma
+avaliação qualitativa dos autores, sem teste de compreensão com usuários.
+Nenhuma saída foi reescrita para reforçar a seleção. Uma coleta complementar
+deve registrar todas as novas tentativas e comparar original e reformulação
+com os mesmos critérios, sem tratar toda resposta diferente como melhoria.

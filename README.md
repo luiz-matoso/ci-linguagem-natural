@@ -86,6 +86,8 @@ O endpoint `:free` não cobra tokens, mas possui limites de requisição e pode
 ter disponibilidade variável. Não envie dados pessoais ou confidenciais ao
 modelo gratuito. O SDK `openai` é utilizado apenas como cliente compatível,
 apontando para `https://openrouter.ai/api/v1`.
+O `python-dotenv` lê as variáveis do `.env`, permitindo configurar a chave
+e o modelo sem inseri-los no código.
 
 ## Usar pelo código
 
@@ -110,14 +112,23 @@ Essa mudança altera a representação e exige uma nova calibração para uso re
 
 ```bash
 python -m unittest discover -s tests -v
+python avaliacao.py --ablacao-v1
 python avaliacao.py --experimentos-v2
 python avaliacao.py --calibrar --versao v2
 python avaliacao.py
 ```
 
-A comparação de configurações e a calibração leem somente
-`data/validacao.csv` (12 perguntas do escopo e 8 de rejeição). O primeiro
-comando compara dois modelos com e sem a normalização da v0 e grava
+A ablação, a comparação de configurações e a calibração leem somente
+`data/validacao.csv` (12 perguntas do escopo e 8 de rejeição).
+`--ablacao-v1` liga/desliga apenas o stemming, mantendo as outras etapas e o
+limiar 0,70, e grava `resultados/ablacao_v1.csv`. Na validação, desligar o
+stemming elevou a Acurácia@1 de 16,67% para 33,33% e o MRR de 0,4421 para
+0,4594; rejeição correta (100%) e falsa rejeição (83,33%) não mudaram.
+Esse experimento complementar não altera a configuração padrão ou as
+métricas do teste já entregue. A metodologia está na Seção 6.6 de
+[docs/decisoes.md](docs/decisoes.md#66-ablação-isolada-do-stemming-na-v1).
+
+`--experimentos-v2` compara dois modelos com e sem a normalização da v0 e grava
 `resultados/experimentos_v2.csv`. A calibração testa limiares de 0 a 1 com
 passo 0,05 e grava `resultados/calibracao_v2.csv`.
 
@@ -125,6 +136,9 @@ A avaliação usa `data/teste.csv` (30 paráfrases e 5 perguntas fora do escopo)
 imprime as quatro métricas e grava automaticamente as linhas v1 e v2 em
 `resultados/comparacao.csv`. O teste não deve ser usado para escolher modelo,
 normalização ou limiar.
+As perguntas do teste atual foram preparadas sem autoria independente; essa
+limitação e o procedimento para uma futura coleta estão na Seção 2.2 de
+[docs/decisoes.md](docs/decisoes.md#22-validação-e-teste).
 
 Resultados com os limiares fixados: v1 obteve Acurácia@1 **66,67%**, MRR
 **0,7414**, rejeição correta **100%** e falsa rejeição **66,67%**; v2 obteve
@@ -143,7 +157,7 @@ estão em [docs/decisoes.md](docs/decisoes.md).
 - `chat.py`: interface de terminal.
 - `avaliacao.py`: calibração e métricas.
 - `data/`: base, validação e teste separados.
-- `tests/`: testes automatizados da v1 e da v2 com `unittest`.
+- `tests/`: testes automatizados da v1, v2, avaliação e RAG com `unittest`.
 - `resultados/`: resultados gerados pela avaliação.
 - `docs/decisoes.md`: decisões consolidadas da v0, v1 e v2, experimentos e análise de erros.
 

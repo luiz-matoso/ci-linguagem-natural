@@ -132,17 +132,48 @@ def comparar_configuracoes_v2():
     return linhas
 
 
+def comparar_stemming_v1():
+    """Isola o efeito do RSLP na validação, mantendo as demais etapas e o limiar."""
+    perguntas = carregar_perguntas(RAIZ / "data" / "validacao.csv")
+    linhas = []
+    for aplicar_stemming in [True, False]:
+        assistente = ChatbotTFIDF(
+            limiar=LIMIAR_PADRAO,
+            opcoes_normalizacao={"aplicar_stemming": aplicar_stemming},
+        )
+        resultados = obter_resultados(assistente, perguntas)
+        linhas.append({
+            "versao": "v1",
+            "conjunto": "validacao",
+            "aplicar_stemming": aplicar_stemming,
+            "limiar": assistente.limiar,
+            **calcular_metricas(resultados, assistente.limiar),
+        })
+    salvar_csv(RAIZ / "resultados" / "ablacao_v1.csv", linhas)
+    return linhas
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--calibrar", action="store_true",
+    modos = parser.add_mutually_exclusive_group()
+    modos.add_argument("--calibrar", action="store_true",
                         help="Usa somente data/validacao.csv para escolher o limiar.")
-    parser.add_argument("--experimentos-v2", action="store_true",
+    modos.add_argument("--experimentos-v2", action="store_true",
                         help="Compara modelos e normalização somente na validação.")
+    modos.add_argument("--ablacao-v1", action="store_true",
+                       help="Liga/desliga somente o stemming na validação, com limiar fixo 0,70.")
     parser.add_argument("--versao", choices=["v1", "v2", "todas"], default="todas")
     parser.add_argument("--limiar-v1", type=float, default=LIMIAR_PADRAO)
     parser.add_argument("--limiar-v2", type=float, default=LIMIAR_DENSO_PADRAO)
     args = parser.parse_args()
     try:
+        if args.ablacao_v1:
+            for linha in comparar_stemming_v1():
+                print(f"v1 stemming={linha['aplicar_stemming']} "
+                      f"limiar={linha['limiar']:.2f}")
+                for nome in ["acuracia_1", "mrr", "rejeicao_correta", "falsa_rejeicao"]:
+                    print(f"  {nome}: {linha[nome]:.4f}")
+            return
         if args.experimentos_v2:
             for linha in comparar_configuracoes_v2():
                 print(

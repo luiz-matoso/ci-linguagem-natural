@@ -4,12 +4,14 @@ import csv
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 from avaliacao import (
     calcular_metricas, calibrar_limiar, carregar_perguntas, obter_resultados,
+    comparar_stemming_v1,
 )
 from src.base import carregar_base
 from src.chatbot_tfidf import (
@@ -137,6 +139,36 @@ class TestAssistente(unittest.TestCase):
 
 
 class TestAvaliacao(unittest.TestCase):
+    def test_ablacao_usa_so_validacao_e_preserva_limiar(self):
+        # A ablação deve funcionar sem ter acesso ao conjunto de teste.
+        raiz = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as pasta:
+            destino = Path(pasta)
+            (destino / "data").mkdir()
+            (destino / "data" / "validacao.csv").write_bytes(
+                (raiz / "data" / "validacao.csv").read_bytes()
+            )
+            with patch("avaliacao.RAIZ", destino), patch(
+                "avaliacao.calibrar_limiar",
+                side_effect=AssertionError("A ablação deve manter o limiar fixo."),
+            ):
+                linhas = comparar_stemming_v1()
+            with (destino / "resultados" / "ablacao_v1.csv").open() as arquivo:
+                gravadas = list(csv.DictReader(arquivo))
+            self.assertEqual(len(gravadas), 2)
+            self.assertEqual([r["aplicar_stemming"] for r in gravadas], ["True", "False"])
+            self.assertTrue(all(r["limiar"] == "0.7" for r in gravadas))
+            # Confere as métricas exportadas por uma avaliação direta independente.
+            perguntas = carregar_perguntas(destino / "data" / "validacao.csv")
+            for linha in linhas:
+                bot = ChatbotTFIDF(
+                    limiar=0.7,
+                    opcoes_normalizacao={"aplicar_stemming": linha["aplicar_stemming"]},
+                )
+                esperado = calcular_metricas(obter_resultados(bot, perguntas), 0.7)
+                for metrica, valor in esperado.items():
+                    self.assertAlmostEqual(linha[metrica], valor)
+
     def test_metricas_separam_ranking_e_rejeicao(self):
         resultados = [
             (1, Resultado("rejeição", -1, 0.3, [(1, 0.3), (2, 0.2)])),
